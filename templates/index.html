@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Energy Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .appliance-row:hover .remove-btn { opacity: 1; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Tab styles */
+        .tab-btn.active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .tab-btn.disabled {
+            color: #9ca3af;
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Energy Agent</h1>
+            <p id="header-subtitle" class="text-lg text-gray-600 mt-2">Your personal energy assistant.</p>
+        </header>
+
+        <main>
+            <div class="mb-8 border-b border-gray-200">
+                <nav class="flex -mb-px space-x-6" aria-label="Tabs">
+                    <button id="tab-btn-calculator" class="tab-btn active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg">
+                        ⚡ Energy Calculator
+                    </button>
+                    <button id="tab-btn-weather" class="tab-btn disabled whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg">
+                        🌦️ Weather Agent
+                    </button>
+                </nav>
+            </div>
+
+            <div>
+                <div id="tab-content-calculator">
+                    <div id="initial-setup">
+                        <section id="appliance-input-section" class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                            <h2 class="text-2xl font-semibold mb-6 text-gray-800">Your Appliances</h2>
+                            <div id="appliance-list" class="space-y-4"></div>
+                            <div class="mt-6">
+                                <button id="add-appliance-btn" class="bg-blue-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors">+ Add Appliance</button>
+                            </div>
+                        </section>
+                        <div class="text-center mb-8">
+                            <button id="calculate-btn" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-green-700 transition-colors">Calculate My Consumption</button>
+                        </div>
+                    </div>
+                    <section id="results-section" class="hidden bg-white p-6 rounded-2xl shadow-lg mb-8"></section>
+                    <section id="suggestions-section" class="hidden"></section>
+                    <section id="location-section" class="hidden bg-white p-6 rounded-2xl shadow-lg mb-8 fade-in"></section>
+                </div>
+
+                <div id="tab-content-weather" class="hidden">
+                    <section id="proactive-agent-section">
+                        <div id="proactive-output" class="bg-white p-6 rounded-2xl shadow-lg">
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Element references
+        const applianceList = document.getElementById('appliance-list');
+        const addApplianceBtn = document.getElementById('add-appliance-btn');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const resultsSection = document.getElementById('results-section');
+        const suggestionsSection = document.getElementById('suggestions-section');
+        const initialSetup = document.getElementById('initial-setup');
+        const locationSection = document.getElementById('location-section');
+        const proactiveOutput = document.getElementById('proactive-output');
+        const headerSubtitle = document.getElementById('header-subtitle');
+        
+        // Tab elements
+        const tabBtnCalculator = document.getElementById('tab-btn-calculator');
+        const tabBtnWeather = document.getElementById('tab-btn-weather');
+        const tabContentCalculator = document.getElementById('tab-content-calculator');
+        const tabContentWeather = document.getElementById('tab-content-weather');
+
+
+        // initial data
+        const defaultAppliances = [
+            { name: 'Refrigerator', wattage: 200, hours: 24 }, { name: 'Ceiling Fan', wattage: 75, hours: 12 },
+            { name: 'LED TV', wattage: 80, hours: 5 }, { name: 'Air Conditioner (1.5 Ton)', wattage: 1500, hours: 6 },
+            { name: 'LED Bulb', wattage: 10, hours: 8 }, { name: 'Water Pump', wattage: 750, hours: 1 }
+        ];
+
+        // EVENT LISTENERS 
+        addApplianceBtn.addEventListener('click', () => addApplianceRow());
+        calculateBtn.addEventListener('click', handleCalculation);
+        tabBtnCalculator.addEventListener('click', () => switchTab('calculator'));
+        tabBtnWeather.addEventListener('click', () => {
+            if (!tabBtnWeather.classList.contains('disabled')) {
+                switchTab('weather');
+            }
+        });
+
+        // --- INITIAL SETUP ---
+        defaultAppliances.forEach(appliance => addApplianceRow(appliance));
+
+        // --- TAB MANAGEMENT ---
+        function switchTab(tabName) {
+            if (tabName === 'calculator') {
+                tabContentCalculator.style.display = 'block';
+                tabContentWeather.style.display = 'none';
+                tabBtnCalculator.classList.add('active');
+                tabBtnWeather.classList.remove('active');
+            } else {
+                tabContentCalculator.style.display = 'none';
+                tabContentWeather.style.display = 'block';
+                tabBtnCalculator.classList.remove('active');
+                tabBtnWeather.classList.add('active');
+            }
+        }
+
+        // --- CORE FUNCTIONS (PHASE 1) ---
+        function addApplianceRow(appliance = {}) {
+            const row = document.createElement('div');
+            row.className = 'appliance-row grid grid-cols-1 md:grid-cols-4 gap-4 items-center';
+            row.innerHTML = `
+                <input type="text" data-name="name" value="${appliance.name || ''}" placeholder="Appliance Name" class="md:col-span-2 bg-gray-50 border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500">
+                <input type="number" data-name="wattage" value="${appliance.wattage || ''}" placeholder="Wattage" class="bg-gray-50 border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500">
+                <div class="relative">
+                    <input type="number" data-name="hours" value="${appliance.hours || ''}" placeholder="Hours/Day" class="w-full bg-gray-50 border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500">
+                    <button class="remove-btn absolute right-[-35px] top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 font-bold text-2xl opacity-0 transition-opacity">&times;</button>
+                </div>
+            `;
+            applianceList.appendChild(row);
+            row.querySelector('.remove-btn').addEventListener('click', () => row.remove());
+        }
+
+        function handleCalculation() {
+            let totalKWh = 0;
+            const applianceData = [];
+            document.querySelectorAll('.appliance-row').forEach(row => {
+                const name = row.querySelector('[data-name="name"]').value || 'Unnamed';
+                const wattage = parseFloat(row.querySelector('[data-name="wattage"]').value) || 0;
+                const hours = parseFloat(row.querySelector('[data-name="hours"]').value) || 0;
+                if (wattage > 0 && hours > 0) {
+                    const dailyKWh = (wattage * hours) / 1000;
+                    totalKWh += dailyKWh;
+                    applianceData.push({ name, kwh: dailyKWh, wattage, hours });
+                }
+            });
+            displayResults(totalKWh, applianceData);
+            generateAISuggestions(applianceData);
+            displayLocationInput();
+        }
+
+        function displayResults(totalKWh, applianceData) {
+            const monthlyKWh = totalKWh * 30;
+            applianceData.sort((a, b) => b.kwh - a.kwh);
+            let breakdownHTML = applianceData.map(app => `<div class="flex justify-between py-2 border-b"><span class="text-gray-600">${app.name}</span><span class="font-semibold">${app.kwh.toFixed(2)} kWh/day</span></div>`).join('');
+            resultsSection.innerHTML = `
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Your Energy Report</h2>
+                <div class="text-center mb-6"><p class="text-xl">Total Daily Consumption:</p><p class="text-4xl font-bold text-green-600">${totalKWh.toFixed(2)} kWh</p><p class="text-gray-500 mt-1">(${monthlyKWh.toFixed(2)} kWh/month)</p></div>
+                <h3 class="text-xl font-semibold mb-2 text-left">Consumption Breakdown:</h3><div class="space-y-2">${breakdownHTML}</div>
+            `;
+            resultsSection.classList.remove('hidden');
+            resultsSection.classList.add('fade-in');
+        }
+
+        async function generateAISuggestions(applianceData) {
+            suggestionsSection.innerHTML = '<div class="loader"></div><p class="text-center text-gray-500">Generating AI suggestions...</p>';
+            suggestionsSection.classList.remove('hidden');
+            suggestionsSection.classList.add('fade-in');
+
+            try {
+                const payload = applianceData.map(app => ({
+                    name: app.name,
+                    wattage: app.wattage,
+                    hours: app.hours
+                }));
+
+                const response = await fetch('/api/reactive_tips', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appliances: payload })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server Error: ${response.status} - ${errorText}`);
+                }
+                
+                const suggestions = await response.json();
+
+                let html = '<h2 class="text-2xl font-semibold mb-4 text-gray-800">AI-Powered Suggestions</h2><div id="suggestions-output" class="space-y-4">';
+                if (suggestions.general_tips) {
+                    html += '<h3 class="text-xl font-semibold mb-3 text-gray-800">General Tips</h3>';
+                    suggestions.general_tips.forEach(item => { 
+                        html += `<div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400"><p class="font-semibold text-blue-800">${item.tip}</p><p class="text-sm text-blue-700 mt-1">${item.details}</p></div>`; 
+                    });
+                }
+                if (suggestions.appliance_tips) {
+                    html += '<h3 class="text-xl font-semibold mt-6 mb-3 text-gray-800">For Your High-Usage Appliances</h3>';
+                    suggestions.appliance_tips.forEach(item => { 
+                        html += `<div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400"><p class="font-semibold text-yellow-800">Tip for ${item.appliance_name}: ${item.tip}</p><p class="text-sm text-yellow-700 mt-1">${item.details}</p></div>`; 
+                    });
+                }
+                html += '</div>';
+                suggestionsSection.innerHTML = html;
+            } catch (error) {
+                console.error("AI Suggestion Error:", error);
+                suggestionsSection.innerHTML = `<h2 class="text-2xl font-semibold mb-4 text-gray-800">AI-Powered Suggestions</h2><p class="text-center text-red-500">Could not fetch AI suggestions.</p>`;
+            }
+        }
+
+
+        // --- AGENT LOGIC (PHASE 2) ---
+        function displayLocationInput() {
+            locationSection.innerHTML = `
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Activate Proactive Agent</h2>
+                <p class="text-gray-600 mb-4">To provide timely tips based on your local weather, please enter your city.</p>
+                <div class="flex gap-4">
+                    <input type="text" id="location-input" placeholder="e.g., Hubballi" class="flex-grow bg-gray-50 border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500">
+                    <button id="save-location-btn" class="bg-purple-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-purple-700 transition-colors">Activate</button>
+                </div>
+            `;
+            locationSection.classList.remove('hidden');
+            document.getElementById('save-location-btn').addEventListener('click', handleLocationSave);
+        }
+
+        function handleLocationSave() {
+            const locationInput = document.getElementById('location-input');
+            const location = locationInput.value.trim();
+            if (!location) {
+                alert("Please enter a location.");
+                return;
+            }
+            tabBtnWeather.classList.remove('disabled');
+            switchTab('weather');
+            startProactiveAgent(location);
+        }
+
+        function startProactiveAgent(location) {
+            headerSubtitle.textContent = `Monitoring weather for ${location}...`;
+            updateProactiveTip(location);
+            setInterval(() => updateProactiveTip(location), 15000); 
+        }
+
+        async function updateProactiveTip(location) {
+            proactiveOutput.innerHTML = '<div class="loader"></div><p class="text-center text-gray-500">Checking weather and generating a new tip...</p>';
+
+            try {
+                const response = await fetch('/api/proactive_tip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ location: location })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server Error: ${response.status} - ${errorText}`);
+                }
+                const result = await response.json();
+                const tipText = result.tip;
+
+                proactiveOutput.innerHTML = `<div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400"><p class="font-semibold text-purple-800">Weather-Based Tip</p><p class="text-sm text-purple-700 mt-1">${tipText}</p></div>`;
+
+            } catch (error) {
+                console.error("Proactive Tip Error:", error);
+                proactiveOutput.innerHTML = `<p class="text-center text-red-500">Could not fetch a weather-based tip.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
